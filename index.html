@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Claire's map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+  <style>
+    /* Overall font and background */
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+      background: #e9f2ec; /* soft greenish background */
+      color: #23333a;      /* dark blue‑grey text */
+    }
+
+    #map {
+      height: 100vh;
+      width: calc(100vw - 280px);
+      float: left;
+      background: #dbe4ea; /* gentle blue‑grey behind tiles */
+    }
+
+    /* Right popout Layers panel */
+    #layers-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 280px;
+      height: 100vh;
+      background: #f7faf8; /* soft off‑white/green */
+      border-left: 1px solid #c4d4cc;
+      box-shadow: -2px 0 6px rgba(0,0,0,0.12);
+      padding: 12px 12px 16px 12px;
+      box-sizing: border-box;
+      font-size: 14px;
+      overflow-y: auto;
+      z-index: 1000;
+    }
+
+    #layers-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    /* Bigger, friendlier title */
+    #layers-header-title {
+      font-weight: 600;
+      font-size: 18px;
+      letter-spacing: 0.02em;
+      color: #1c4a3c; /* deep green */
+    }
+
+    #help-btn {
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 16px;
+      border: 1px solid #7fb59b;
+      background: #d7f0e3;         /* soft green button */
+      color: #1c4a3c;
+      transition: background 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    #help-btn:hover {
+      background: #c7e6d8;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    }
+
+    /* Old inline help box not used visually now */
+    #help-box {
+      display: none;
+    }
+
+    h3 {
+      margin-top: 8px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #355565;
+    }
+
+    .layer-item {
+      margin-bottom: 10px;
+      border-bottom: 1px solid #d4e0d9;
+      padding-bottom: 8px;
+    }
+
+    .layer-title {
+      font-weight: 500;
+      display: inline-block;
+      margin-left: 4px;
+      color: #23333a;
+    }
+
+    .slider-row {
+      margin-top: 4px;
+    }
+
+    .slider-row input[type="range"] {
+      width: 100%;
+      accent-color: #4b9c7a; /* slider thumb/track colour */
+    }
+
+    /* Checkbox accent colour (supported modern browsers) */
+    input[type="checkbox"] {
+      accent-color: #4b9c7a;
+      cursor: pointer;
+    }
+
+    /* Simple home button control styling (Leaflet-like) */
+    .leaflet-control-home {
+      background: #f7faf8;
+      border-radius: 4px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+      padding: 0;
+      border: 1px solid #c4d4cc;
+    }
+
+    .leaflet-control-home button {
+      width: 30px;
+      height: 30px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 30px;
+      color: #1c4a3c;
+    }
+
+    .leaflet-control-home button:hover {
+      background: #d7f0e3;
+    }
+
+    /* Leaflet default controls tweak to match scheme */
+    .leaflet-control-zoom a {
+      background: #f7faf8;
+      color: #23333a;
+      border: 1px solid #c4d4cc;
+    }
+
+    .leaflet-control-zoom a:hover {
+      background: #d7f0e3;
+      color: #1c4a3c;
+    }
+
+    /* Full-screen dark overlay behind help dialog */
+    #help-overlay {
+      display: none;
+      position: fixed;
+      z-index: 2000; /* above map and side panel */
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.45);
+    }
+
+    /* Centered help dialog */
+    #help-dialog {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #f7faf8;
+      padding: 20px;
+      max-width: 640px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+      border-radius: 6px;
+      font-size: 14px;
+      border: 1px solid #c4d4cc;
+    }
+
+    #help-dialog h2 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 18px;
+      color: #1c4a3c;
+    }
+
+    #help-dialog h3 {
+      margin-top: 12px;
+    }
+
+    #help-close {
+      float: right;
+      cursor: pointer;
+      border: none;
+      background: #d7f0e3;
+      padding: 4px 10px;
+      margin-left: 10px;
+      border-radius: 14px;
+      color: #1c4a3c;
+      font-size: 12px;
+    }
+
+    #help-close:hover {
+      background: #c7e6d8;
+    }
+
+    #help-dialog p {
+      margin-bottom: 0.6em;
+    }
+
+    #help-dialog ul {
+      margin-top: 0.2em;
+      padding-left: 1.2em;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div id="layers-panel">
+    <div id="layers-header">
+      <div id="layers-header-title"><b>Claire's map</b></div>
+      <button id="help-btn">help</button>
+    </div>
+
+    <!-- Kept but unused visually -->
+    <div id="help-box"></div>
+
+    <h3>Layers</h3>
+
+    <!-- 1. Public rights of way (top) -->
+    <div class="layer-item">
+      <input type="checkbox" id="chk-prow" />
+      <span class="layer-title">Public Rights of Way</span>
+      <div class="slider-row">
+        <input id="slider-prow" type="range" min="0" max="1" step="0.01" value="1.0">
+      </div>
+    </div>
+
+    <!-- 2. Esri World Imagery -->
+    <div class="layer-item">
+      <input type="checkbox" id="chk-esri" />
+      <span class="layer-title">Esri World Imagery</span>
+      <div class="slider-row">
+        <input id="slider-esri" type="range" min="0" max="1" step="0.01" value="1.0">
+      </div>
+    </div>
+
+    <!-- 3. Ordnance Survey 1886 6 inch to the mile -->
+    <div class="layer-item">
+      <input type="checkbox" id="chk-norfolk" />
+      <span class="layer-title">Ordnance Survey 1886 6 inch to the mile</span>
+      <div class="slider-row">
+        <input id="slider-norfolk" type="range" min="0" max="1" step="0.01" value="1.0">
+      </div>
+    </div>
+
+    <!-- 4. Ordnance Survey 1886 25 inch to the mile -->
+    <div class="layer-item">
+      <input type="checkbox" id="chk-os1886" />
+      <span class="layer-title">Ordnance Survey 1886 25 inch to the mile</span>
+      <div class="slider-row">
+        <input id="slider-os1886" type="range" min="0" max="1" step="0.01" value="1.0">
+      </div>
+    </div>
+
+    <!-- 5. OpenStreetMap (bottom) -->
+    <div class="layer-item">
+      <input type="checkbox" id="chk-osm" checked />
+      <span class="layer-title">OpenStreetMap</span>
+      <div class="slider-row">
+        <input id="slider-osm" type="range" min="0" max="1" step="0.01" value="1.0">
+      </div>
+    </div>
+  </div>
+
+  <!-- Help overlay and dialog -->
+  <div id="help-overlay">
+    <div id="help-dialog">
+      <button id="help-close">Close</button>
+      <h2>How to use this map</h2>
+
+      <p>The large area on the left is the map itself. You can move around by clicking and dragging, or by dragging with your finger on a touchscreen.</p>
+      <p>Use the plus and minus buttons in the top-left of the map, or your mouse scroll wheel, to zoom in and out.</p>
+
+      <h3>Layers panel</h3>
+      <p>The panel on the right controls which layers you can see.</p>
+      <ul>
+        <li>Each layer has a tick box to turn it on or off.</li>
+        <li>Each layer also has a slider to make it more or less transparent.</li>
+      </ul>
+
+      <h3>Available layers</h3>
+      <ul>
+        <li><strong>Public Rights of Way</strong>: Lines showing paths and tracks.</li>
+        <li><strong>Esri World Imagery</strong>: Satellite/aerial imagery background.</li>
+        <li><strong>Ordnance Survey 1886 6 inch to the mile</strong>: Slightly less detailed historic map from 1886.</li>
+        <li><strong>Ordnance Survey 1886 25 inch to the mile</strong>: Detailed historic map from 1886.</li>
+        <li><strong>OpenStreetMap</strong>: Modern street map with roads, buildings and place names.</li>
+      </ul>
+
+      <h3>Home button</h3>
+      <p>The house button in the top-left of the map returns you to the starting view if you get lost.</p>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/esri-leaflet/dist/esri-leaflet.js"></script>
+
+  <script>
+    // Home view
+    var homeCenter = [52.79038, 1.48349];
+    var homeZoom = 16;
+
+    // Initialise map
+    var map = L.map('map').setView(homeCenter, homeZoom);
+
+    // --- PANES FOR Z-ORDER (bottom to top) ---
+    map.createPane('pane-osm');        // bottom
+    map.getPane('pane-osm').style.zIndex = 400;
+
+    map.createPane('pane-os1886');     // above OSM
+    map.getPane('pane-os1886').style.zIndex = 410;
+
+    map.createPane('pane-norfolk');    // above OS 25"
+    map.getPane('pane-norfolk').style.zIndex = 420;
+
+    map.createPane('pane-esri');       // above OS 6"
+    map.getPane('pane-esri').style.zIndex = 430;
+
+    map.createPane('pane-prow');       // top
+    map.getPane('pane-prow').style.zIndex = 440;
+
+    // --- LAYER DEFINITIONS ---
+
+    // 5. OSM base (bottom)
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      pane: 'pane-osm',
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // 2. Esri World Imagery
+    var esriImagery = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {
+        maxZoom: 19,
+        opacity: 1.0,
+        pane: 'pane-esri',
+        attribution: 'Tiles © Esri'
+      }
+    );
+
+    // 3. Ordnance Survey 1886 6 inch to the mile
+    var norfolkOverlay = L.tileLayer(
+      'https://mapseries-tilesets.s3.amazonaws.com/os/six-inch-norfolk/{z}/{x}/{y}.png',
+      {
+        maxZoom: 19,
+        opacity: 1.0,
+        pane: 'pane-norfolk',
+        attribution: 'Rendered with MapTiler Desktop'
+      }
+    );
+
+    // 4. Ordnance Survey 1886 25 inch to the mile
+    var os1886 = L.tileLayer(
+      'https://allmaps.xyz/images/92d363d02bc10c58/{z}/{x}/{y}@2x.png',
+      {
+        maxZoom: 19,
+        opacity: 1.0,
+        pane: 'pane-os1886',
+        attribution: 'Allmaps / Ordnance Survey 1886'
+      }
+    );
+
+    // 1. PROW feature layer (top)
+    var prowLayer = L.esri.featureLayer({
+      url: 'https://maps.norfolk.gov.uk/arcgis/rest/services/layers_ext/highways/MapServer/2',
+      pane: 'pane-prow',
+      style: function () {
+        return {
+          color: '#ff00c5',
+          weight: 2.5,
+          opacity: 1
+        };
+      },
+      attribution: 'Norfolk County Council'
+    });
+
+    // --- TOGGLE + OPACITY HELPERS ---
+
+    function bindToggle(chkId, layer) {
+      var chk = document.getElementById(chkId);
+      chk.addEventListener('change', function () {
+        if (chk.checked) {
+          if (!map.hasLayer(layer)) layer.addTo(map);
+        } else {
+          if (map.hasLayer(layer)) map.removeLayer(layer);
+        }
+      });
+    }
+
+    function bindOpacity(sliderId, layer, isVector) {
+      var slider = document.getElementById(sliderId);
+      slider.addEventListener('input', function () {
+        var v = parseFloat(this.value);
+        if (isVector) {
+          layer.setStyle({ opacity: v });
+        } else if (layer.setOpacity) {
+          layer.setOpacity(v);
+        }
+      });
+    }
+
+    // Initial visibility bindings
+    bindToggle('chk-osm', osm);
+    bindToggle('chk-esri', esriImagery);
+    bindToggle('chk-norfolk', norfolkOverlay);
+    bindToggle('chk-os1886', os1886);
+    bindToggle('chk-prow', prowLayer);
+
+    // Make sure OSM is present initially
+    if (!map.hasLayer(osm)) osm.addTo(map);
+
+    // Opacity sliders
+    bindOpacity('slider-osm', osm, false);
+    bindOpacity('slider-esri', esriImagery, false);
+    bindOpacity('slider-norfolk', norfolkOverlay, false);
+    bindOpacity('slider-os1886', os1886, false);
+    bindOpacity('slider-prow', prowLayer, true);
+
+    // Help overlay logic
+    var helpBtn = document.getElementById('help-btn');
+    var helpOverlay = document.getElementById('help-overlay');
+    var helpClose = document.getElementById('help-close');
+
+    helpBtn.addEventListener('click', function () {
+      helpOverlay.style.display = 'block';
+    });
+
+    helpClose.addEventListener('click', function () {
+      helpOverlay.style.display = 'none';
+    });
+
+    // Optional: close when clicking outside the dialog
+    helpOverlay.addEventListener('click', function (e) {
+      if (e.target === helpOverlay) {
+        helpOverlay.style.display = 'none';
+      }
+    });
+
+    // --- HOME BUTTON CONTROL ---
+
+    var HomeControl = L.Control.extend({
+      options: {
+        position: 'topleft'
+      },
+      onAdd: function (map) {
+        var container = L.DomUtil.create('div', 'leaflet-control-home leaflet-bar');
+        var button = L.DomUtil.create('button', '', container);
+        button.innerHTML = '🏠';
+
+        L.DomEvent.on(button, 'click', function (e) {
+          L.DomEvent.stopPropagation(e);
+          L.DomEvent.preventDefault(e);
+          map.setView(homeCenter, homeZoom);
+        });
+
+        return container;
+      }
+    });
+
+    map.addControl(new HomeControl());
+  </script>
+</body>
+</html>
