@@ -9,19 +9,24 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
   <style>
-    /* Overall font and background */
     body {
       margin: 0;
       font-family: "Trebuchet MS", "Segoe UI", Arial, sans-serif;
-      background: #e9f2ec; /* soft greenish background */
-      color: #23333a;      /* dark blue‑grey text */
+      background: #e9f2ec;
+      color: #23333a;
     }
 
+    /* Wrap map and panel so we can tweak layout if needed (optional) */
     #map {
       height: 100vh;
       width: calc(100vw - 280px);
       float: left;
-      background: #dbe4ea; /* gentle blue‑grey behind tiles */
+      background: #dbe4ea;
+      transition: width 0.2s ease; /* NEW: smooth resize */
+    }
+
+    #map.full-width {            /* NEW: map when panel hidden */
+      width: 100vw;
     }
 
     /* Right popout Layers panel */
@@ -31,7 +36,7 @@
       right: 0;
       width: 280px;
       height: 100vh;
-      background: #f7faf8; /* soft off‑white/green */
+      background: #f7faf8;
       border-left: 1px solid #c4d4cc;
       box-shadow: -2px 0 6px rgba(0,0,0,0.12);
       padding: 12px 12px 16px 12px;
@@ -39,6 +44,12 @@
       font-size: 14px;
       overflow-y: auto;
       z-index: 1000;
+      transition: transform 0.2s ease; /* NEW: slide effect */
+    }
+
+    /* NEW: hidden state for panel (slide off-screen) */
+    #layers-panel.hidden {
+      transform: translateX(100%);
     }
 
     #layers-header {
@@ -48,12 +59,11 @@
       margin-bottom: 10px;
     }
 
-    /* Bigger, friendlier title */
     #layers-header-title {
       font-weight: 600;
       font-size: 18px;
       letter-spacing: 0.02em;
-      color: #1c4a3c; /* deep green */
+      color: #1c4a3c;
     }
 
     #help-btn {
@@ -62,9 +72,10 @@
       cursor: pointer;
       border-radius: 16px;
       border: 1px solid #7fb59b;
-      background: #d7f0e3;         /* soft green button */
+      background: #d7f0e3;
       color: #1c4a3c;
       transition: background 0.15s ease, box-shadow 0.15s ease;
+      margin-left: 6px;
     }
 
     #help-btn:hover {
@@ -72,7 +83,46 @@
       box-shadow: 0 1px 4px rgba(0,0,0,0.18);
     }
 
-    /* Old inline help box not used visually now */
+    /* NEW: Close button in header */
+    #layers-close-btn {
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 16px;
+      border: 1px solid #c4d4cc;
+      background: #ffffff;
+      color: #23333a;
+      margin-right: 4px;
+      transition: background 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    #layers-close-btn:hover {
+      background: #e3ece6;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    }
+
+    /* NEW: “Layers” button in map corner when panel is hidden */
+    #layers-toggle-btn {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1100; /* above map and panel */
+      padding: 6px 14px;
+      font-size: 13px;
+      border-radius: 18px;
+      border: 1px solid #7fb59b;
+      background: #d7f0e3;
+      color: #1c4a3c;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+      transition: background 0.15s ease, box-shadow 0.15s ease;
+      display: none; /* hidden by default; shown when panel closed */
+    }
+
+    #layers-toggle-btn:hover {
+      background: #c7e6d8;
+    }
+
     #help-box {
       display: none;
     }
@@ -104,16 +154,14 @@
 
     .slider-row input[type="range"] {
       width: 100%;
-      accent-color: #4b9c7a; /* slider thumb/track colour */
+      accent-color: #4b9c7a;
     }
 
-    /* Checkbox accent colour (supported modern browsers) */
     input[type="checkbox"] {
       accent-color: #4b9c7a;
       cursor: pointer;
     }
 
-    /* Simple home button control styling (Leaflet-like) */
     .leaflet-control-home {
       background: #f7faf8;
       border-radius: 4px;
@@ -137,7 +185,6 @@
       background: #d7f0e3;
     }
 
-    /* Leaflet default controls tweak to match scheme */
     .leaflet-control-zoom a {
       background: #f7faf8;
       color: #23333a;
@@ -149,11 +196,10 @@
       color: #1c4a3c;
     }
 
-    /* Full-screen dark overlay behind help dialog */
     #help-overlay {
       display: none;
       position: fixed;
-      z-index: 2000; /* above map and side panel */
+      z-index: 2000;
       top: 0;
       left: 0;
       width: 100vw;
@@ -161,7 +207,6 @@
       background: rgba(0, 0, 0, 0.45);
     }
 
-    /* Centered help dialog */
     #help-dialog {
       position: absolute;
       top: 50%;
@@ -219,18 +264,22 @@
 <body>
   <div id="map"></div>
 
+  <!-- NEW: Layers toggle button shown when panel is hidden -->
+  <button id="layers-toggle-btn">Layers</button>
+
   <div id="layers-panel">
     <div id="layers-header">
       <div id="layers-header-title"><b>Claire's map</b></div>
-      <button id="help-btn">help</button>
+      <div>
+        <button id="help-btn">help</button>
+        <button id="layers-close-btn">×</button>
+      </div>
     </div>
 
-    <!-- Kept but unused visually -->
     <div id="help-box"></div>
 
     <h3>Layers</h3>
 
-    <!-- 1. Public rights of way (top) -->
     <div class="layer-item">
       <input type="checkbox" id="chk-prow" />
       <span class="layer-title">Public Rights of Way</span>
@@ -239,7 +288,6 @@
       </div>
     </div>
 
-    <!-- 2. Esri World Imagery -->
     <div class="layer-item">
       <input type="checkbox" id="chk-esri" />
       <span class="layer-title">Esri World Imagery</span>
@@ -248,7 +296,6 @@
       </div>
     </div>
 
-    <!-- 3. Ordnance Survey 1886 6 inch to the mile -->
     <div class="layer-item">
       <input type="checkbox" id="chk-norfolk" />
       <span class="layer-title">Ordnance Survey 1886 6 inch to the mile</span>
@@ -257,7 +304,6 @@
       </div>
     </div>
 
-    <!-- 4. Ordnance Survey 1886 25 inch to the mile -->
     <div class="layer-item">
       <input type="checkbox" id="chk-os1886" />
       <span class="layer-title">Ordnance Survey 1886 25 inch to the mile</span>
@@ -266,7 +312,6 @@
       </div>
     </div>
 
-    <!-- 5. OpenStreetMap (bottom) -->
     <div class="layer-item">
       <input type="checkbox" id="chk-osm" checked />
       <span class="layer-title">OpenStreetMap</span>
@@ -276,7 +321,6 @@
     </div>
   </div>
 
-  <!-- Help overlay and dialog -->
   <div id="help-overlay">
     <div id="help-dialog">
       <button id="help-close">Close</button>
@@ -306,44 +350,27 @@
     </div>
   </div>
 
-  <!-- Scripts -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/esri-leaflet/dist/esri-leaflet.js"></script>
 
   <script>
-    // Home view
     var homeCenter = [52.79038, 1.48349];
     var homeZoom = 16;
 
-    // Initialise map
     var map = L.map('map').setView(homeCenter, homeZoom);
 
-    // --- PANES FOR Z-ORDER (bottom to top) ---
-    map.createPane('pane-osm');        // bottom
-    map.getPane('pane-osm').style.zIndex = 400;
+    map.createPane('pane-osm'); map.getPane('pane-osm').style.zIndex = 400;
+    map.createPane('pane-os1886'); map.getPane('pane-os1886').style.zIndex = 410;
+    map.createPane('pane-norfolk'); map.getPane('pane-norfolk').style.zIndex = 420;
+    map.createPane('pane-esri'); map.getPane('pane-esri').style.zIndex = 430;
+    map.createPane('pane-prow'); map.getPane('pane-prow').style.zIndex = 440;
 
-    map.createPane('pane-os1886');     // above OSM
-    map.getPane('pane-os1886').style.zIndex = 410;
-
-    map.createPane('pane-norfolk');    // above OS 25"
-    map.getPane('pane-norfolk').style.zIndex = 420;
-
-    map.createPane('pane-esri');       // above OS 6"
-    map.getPane('pane-esri').style.zIndex = 430;
-
-    map.createPane('pane-prow');       // top
-    map.getPane('pane-prow').style.zIndex = 440;
-
-    // --- LAYER DEFINITIONS ---
-
-    // 5. OSM base (bottom)
     var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       pane: 'pane-osm',
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // 2. Esri World Imagery
     var esriImagery = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       {
@@ -354,7 +381,6 @@
       }
     );
 
-    // 3. Ordnance Survey 1886 6 inch to the mile
     var norfolkOverlay = L.tileLayer(
       'https://mapseries-tilesets.s3.amazonaws.com/os/six-inch-norfolk/{z}/{x}/{y}.png',
       {
@@ -365,7 +391,6 @@
       }
     );
 
-    // 4. Ordnance Survey 1886 25 inch to the mile
     var os1886 = L.tileLayer(
       'https://allmaps.xyz/images/92d363d02bc10c58/{z}/{x}/{y}@2x.png',
       {
@@ -376,7 +401,6 @@
       }
     );
 
-    // 1. PROW feature layer (top)
     var prowLayer = L.esri.featureLayer({
       url: 'https://maps.norfolk.gov.uk/arcgis/rest/services/layers_ext/highways/MapServer/2',
       pane: 'pane-prow',
@@ -389,8 +413,6 @@
       },
       attribution: 'Norfolk County Council'
     });
-
-    // --- TOGGLE + OPACITY HELPERS ---
 
     function bindToggle(chkId, layer) {
       var chk = document.getElementById(chkId);
@@ -415,24 +437,20 @@
       });
     }
 
-    // Initial visibility bindings
     bindToggle('chk-osm', osm);
     bindToggle('chk-esri', esriImagery);
     bindToggle('chk-norfolk', norfolkOverlay);
     bindToggle('chk-os1886', os1886);
     bindToggle('chk-prow', prowLayer);
 
-    // Make sure OSM is present initially
     if (!map.hasLayer(osm)) osm.addTo(map);
 
-    // Opacity sliders
     bindOpacity('slider-osm', osm, false);
     bindOpacity('slider-esri', esriImagery, false);
     bindOpacity('slider-norfolk', norfolkOverlay, false);
     bindOpacity('slider-os1886', os1886, false);
     bindOpacity('slider-prow', prowLayer, true);
 
-    // Help overlay logic
     var helpBtn = document.getElementById('help-btn');
     var helpOverlay = document.getElementById('help-overlay');
     var helpClose = document.getElementById('help-close');
@@ -445,14 +463,11 @@
       helpOverlay.style.display = 'none';
     });
 
-    // Optional: close when clicking outside the dialog
     helpOverlay.addEventListener('click', function (e) {
       if (e.target === helpOverlay) {
         helpOverlay.style.display = 'none';
       }
     });
-
-    // --- HOME BUTTON CONTROL ---
 
     var HomeControl = L.Control.extend({
       options: {
@@ -474,6 +489,35 @@
     });
 
     map.addControl(new HomeControl());
+
+    // --- NEW: show/hide layers panel + adjust map width ---
+
+    var layersPanel = document.getElementById('layers-panel');
+    var layersCloseBtn = document.getElementById('layers-close-btn');
+    var layersToggleBtn = document.getElementById('layers-toggle-btn');
+    var mapDiv = document.getElementById('map');
+
+    function hideLayersPanel() {
+      layersPanel.classList.add('hidden');
+      layersToggleBtn.style.display = 'block';
+      mapDiv.classList.add('full-width');
+      map.invalidateSize(); // ensure map tiles reflow correctly
+    }
+
+    function showLayersPanel() {
+      layersPanel.classList.remove('hidden');
+      layersToggleBtn.style.display = 'none';
+      mapDiv.classList.remove('full-width');
+      map.invalidateSize();
+    }
+
+    layersCloseBtn.addEventListener('click', function () {
+      hideLayersPanel();
+    });
+
+    layersToggleBtn.addEventListener('click', function () {
+      showLayersPanel();
+    });
   </script>
 </body>
 </html>
