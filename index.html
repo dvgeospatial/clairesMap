@@ -17,6 +17,7 @@
       overflow: hidden;
     }
 
+    /* Map always full viewport */
     #map {
       position: fixed;
       top: 0;
@@ -26,6 +27,7 @@
       background: #dbe4ea;
     }
 
+    /* Overlay Layers panel on top of map */
     #layers-panel {
       position: fixed;
       top: 0;
@@ -43,6 +45,7 @@
       transition: transform 0.2s ease;
     }
 
+    /* Slide completely off-screen when hidden */
     #layers-panel.hidden {
       transform: translateX(100%);
     }
@@ -61,7 +64,7 @@
       color: #1c4a3c;
     }
 
-    #help-btn, #locate-btn {
+    #help-btn {
       padding: 4px 10px;
       font-size: 12px;
       cursor: pointer;
@@ -70,16 +73,10 @@
       background: #d7f0e3;
       color: #1c4a3c;
       transition: background 0.15s ease, box-shadow 0.15s ease;
+      margin-left: 6px;
     }
 
-    #locate-btn {
-      width: 100%;
-      margin-top: 10px;
-      font-weight: 600;
-      padding: 8px;
-    }
-
-    #help-btn:hover, #locate-btn:hover {
+    #help-btn:hover {
       background: #c7e6d8;
       box-shadow: 0 1px 4px rgba(0,0,0,0.18);
     }
@@ -101,6 +98,7 @@
       box-shadow: 0 1px 4px rgba(0,0,0,0.18);
     }
 
+    /* “Layers” button when panel is hidden */
     #layers-toggle-btn {
       position: fixed;
       top: 10px;
@@ -263,6 +261,7 @@
 <body>
   <div id="map"></div>
 
+  <!-- Layers toggle button when panel is hidden -->
   <button id="layers-toggle-btn">Layers</button>
 
   <div id="layers-panel">
@@ -275,11 +274,6 @@
     </div>
 
     <div id="help-box"></div>
-
-    <!-- New Locate Button -->
-    <div class="layer-item">
-      <button id="locate-btn">📍 Show My Location</button>
-    </div>
 
     <h3>Layers</h3>
 
@@ -328,9 +322,28 @@
     <div id="help-dialog">
       <button id="help-close">Close</button>
       <h2>How to use this map</h2>
-      <p>The large area on the left is the map itself. You can move around by clicking and dragging.</p>
-      <h3>Locate Me</h3>
-      <p>Click the "Show My Location" button to find your current position. This requires GPS/Location access on your device.</p>
+
+      <p>The large area on the left is the map itself. You can move around by clicking and dragging, or by dragging with your finger on a touchscreen.</p>
+      <p>Use the plus and minus buttons in the top-left of the map, or your mouse scroll wheel, to zoom in and out.</p>
+
+      <h3>Layers panel</h3>
+      <p>The panel on the right controls which layers you can see.</p>
+      <ul>
+        <li>Each layer has a tick box to turn it on or off.</li>
+        <li>Each layer also has a slider to make it more or less transparent.</li>
+      </ul>
+
+      <h3>Available layers</h3>
+      <ul>
+        <li><strong>Public Rights of Way</strong>: Lines showing paths and tracks.</li>
+        <li><strong>Esri World Imagery</strong>: Satellite/aerial imagery background.</li>
+        <li><strong>Ordnance Survey 1886 6 inch to the mile</strong>: Slightly less detailed historic map from 1886.</li>
+        <li><strong>Ordnance Survey 1886 25 inch to the mile</strong>: Detailed historic map from 1886.</li>
+        <li><strong>OpenStreetMap</strong>: Modern street map with roads, buildings and place names.</li>
+      </ul>
+
+      <h3>Home button</h3>
+      <p>The house button in the top-left of the map returns you to the starting view if you get lost.</p>
     </div>
   </div>
 
@@ -343,7 +356,6 @@
 
     var map = L.map('map').setView(homeCenter, homeZoom);
 
-    // Create panes to manage stacking order
     map.createPane('pane-osm');     map.getPane('pane-osm').style.zIndex = 400;
     map.createPane('pane-os1886');  map.getPane('pane-os1886').style.zIndex = 410;
     map.createPane('pane-norfolk'); map.getPane('pane-norfolk').style.zIndex = 420;
@@ -360,6 +372,7 @@
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       {
         maxZoom: 19,
+        opacity: 1.0,
         pane: 'pane-esri',
         attribution: 'Tiles © Esri'
       }
@@ -369,6 +382,7 @@
       'https://mapseries-tilesets.s3.amazonaws.com/os/six-inch-norfolk/{z}/{x}/{y}.png',
       {
         maxZoom: 19,
+        opacity: 1.0,
         pane: 'pane-norfolk',
         attribution: 'Rendered with MapTiler Desktop'
       }
@@ -378,6 +392,7 @@
       'https://allmaps.xyz/images/92d363d02bc10c58/{z}/{x}/{y}@2x.png',
       {
         maxZoom: 19,
+        opacity: 1.0,
         pane: 'pane-os1886',
         attribution: 'Allmaps / Ordnance Survey 1886'
       }
@@ -387,7 +402,11 @@
       url: 'https://maps.norfolk.gov.uk/arcgis/rest/services/layers_ext/highways/MapServer/2',
       pane: 'pane-prow',
       style: function () {
-        return { color: '#ff00c5', weight: 2.5, opacity: 1 };
+        return {
+          color: '#ff00c5',
+          weight: 2.5,
+          opacity: 1
+        };
       },
       attribution: 'Norfolk County Council'
     });
@@ -395,8 +414,11 @@
     function bindToggle(chkId, layer) {
       var chk = document.getElementById(chkId);
       chk.addEventListener('change', function () {
-        if (chk.checked) { if (!map.hasLayer(layer)) layer.addTo(map); }
-        else { if (map.hasLayer(layer)) map.removeLayer(layer); }
+        if (chk.checked) {
+          if (!map.hasLayer(layer)) layer.addTo(map);
+        } else {
+          if (map.hasLayer(layer)) map.removeLayer(layer);
+        }
       });
     }
 
@@ -404,8 +426,11 @@
       var slider = document.getElementById(sliderId);
       slider.addEventListener('input', function () {
         var v = parseFloat(this.value);
-        if (isVector) { layer.setStyle({ opacity: v }); }
-        else if (layer.setOpacity) { layer.setOpacity(v); }
+        if (isVector) {
+          layer.setStyle({ opacity: v });
+        } else if (layer.setOpacity) {
+          layer.setOpacity(v);
+        }
       });
     }
 
@@ -415,66 +440,56 @@
     bindToggle('chk-os1886', os1886);
     bindToggle('chk-prow', prowLayer);
 
+    if (!map.hasLayer(osm)) osm.addTo(map);
+
     bindOpacity('slider-osm', osm, false);
     bindOpacity('slider-esri', esriImagery, false);
     bindOpacity('slider-norfolk', norfolkOverlay, false);
     bindOpacity('slider-os1886', os1886, false);
     bindOpacity('slider-prow', prowLayer, true);
 
-    // Geolocation Logic
-    var userMarker, userCircle;
-
-    function onLocationFound(e) {
-      var radius = e.accuracy / 2;
-      if (userMarker) {
-        userMarker.setLatLng(e.latlng);
-        userCircle.setLatLng(e.latlng).setRadius(radius);
-      } else {
-        userMarker = L.marker(e.latlng).addTo(map).bindPopup("You are here");
-        userCircle = L.circle(e.latlng, radius).addTo(map);
-      }
-    }
-
-    function onLocationError(e) {
-      alert("Error: " + e.message);
-    }
-
-    map.on('locationfound', onLocationFound);
-    map.on('locationerror', onLocationError);
-
-    document.getElementById('locate-btn').addEventListener('click', function() {
-      map.locate({ setView: true, maxZoom: 18, watch: true, enableHighAccuracy: true });
-    });
-
     // Help overlay logic
     var helpBtn = document.getElementById('help-btn');
     var helpOverlay = document.getElementById('help-overlay');
     var helpClose = document.getElementById('help-close');
 
-    helpBtn.addEventListener('click', function () { helpOverlay.style.display = 'block'; });
-    helpClose.addEventListener('click', function () { helpOverlay.style.display = 'none'; });
+    helpBtn.addEventListener('click', function () {
+      helpOverlay.style.display = 'block';
+    });
+
+    helpClose.addEventListener('click', function () {
+      helpOverlay.style.display = 'none';
+    });
+
     helpOverlay.addEventListener('click', function (e) {
-      if (e.target === helpOverlay) { helpOverlay.style.display = 'none'; }
+      if (e.target === helpOverlay) {
+        helpOverlay.style.display = 'none';
+      }
     });
 
     // Home button control
     var HomeControl = L.Control.extend({
-      options: { position: 'topleft' },
+      options: {
+        position: 'topleft'
+      },
       onAdd: function (map) {
         var container = L.DomUtil.create('div', 'leaflet-control-home leaflet-bar');
         var button = L.DomUtil.create('button', '', container);
         button.innerHTML = '🏠';
+
         L.DomEvent.on(button, 'click', function (e) {
           L.DomEvent.stopPropagation(e);
           L.DomEvent.preventDefault(e);
           map.setView(homeCenter, homeZoom);
         });
+
         return container;
       }
     });
 
     map.addControl(new HomeControl());
 
+    // Show/hide layers panel (no map resize needed; map is always full-screen)
     var layersPanel = document.getElementById('layers-panel');
     var layersCloseBtn = document.getElementById('layers-close-btn');
     var layersToggleBtn = document.getElementById('layers-toggle-btn');
@@ -492,8 +507,13 @@
     layersCloseBtn.addEventListener('click', hideLayersPanel);
     layersToggleBtn.addEventListener('click', showLayersPanel);
 
-    window.addEventListener('load', function () { map.invalidateSize(); });
-    window.addEventListener('resize', function () { map.invalidateSize(); });
+    // Make sure Leaflet has correct size on load and resize
+    window.addEventListener('load', function () {
+      map.invalidateSize();
+    });
+    window.addEventListener('resize', function () {
+      map.invalidateSize();
+    });
   </script>
 </body>
 </html>
